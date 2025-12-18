@@ -82,9 +82,11 @@ export default function Book({ session }) {
     : { transform: 'translateX(0px)' };
 
   return (
-    // 1. MUDANÇA AQUI: 'min-h-screen' em vez de 'h-screen'
-    // 2. MUDANÇA AQUI: 'overflow-x-hidden' em vez de 'overflow-hidden' (libera o scroll vertical)
-    <div className={`min-h-screen w-full flex flex-col justify-between transition-colors duration-500 overflow-x-hidden ${
+    // MUDANÇAS CRÍTICAS AQUI:
+    // 1. h-[100dvh]: Garante que ocupa 100% da tela visível do celular (desconta a barra de navegação).
+    // 2. overflow-y-auto: Habilita a rolagem DENTRO desse container, ignorando bloqueios do body.
+    // 3. fixed inset-0: Fixa o container na tela para evitar que o navegador tente rolar o fundo errado.
+    <div className={`fixed inset-0 h-[100dvh] w-full flex flex-col justify-between transition-colors duration-500 overflow-y-auto overflow-x-hidden ${
       isDarkMode ? "bg-gray-900" : "bg-gradient-to-br from-dream-bg via-white to-pink-100"
     }`}>
 
@@ -104,8 +106,8 @@ export default function Book({ session }) {
         isDarkMode={isDarkMode}
       />
 
-      {/* 3. MUDANÇA AQUI: Adicionei 'pb-12' para dar espaço antes do footer */}
-      <main className="flex-grow flex flex-col items-center justify-start md:justify-center relative w-full pt-4 md:pt-0 pb-12">
+      {/* Adicionei 'pb-24' para garantir que o footer suba bastante e não fique escondido */}
+      <main className="flex-grow flex flex-col items-center justify-start md:justify-center relative w-full pt-4 md:pt-0 pb-24">
         
         <h1 className={`mb-12 md:mb-10 font-title text-2xl md:text-4xl font-bold uppercase tracking-wide drop-shadow-sm transition-colors duration-500 text-center px-4 ${
             isDarkMode ? "text-purple-300" : "text-purple-800"
@@ -182,6 +184,8 @@ export default function Book({ session }) {
         </div>
       </main>
 
+      {/* Footer Fixo: Se preferir, tire o 'pb-24' do main e deixe o footer fluir, 
+          mas assim garantimos que ele aparece no final da rolagem */}
       <Footer isDarkMode={isDarkMode} />
     </div>
   );
