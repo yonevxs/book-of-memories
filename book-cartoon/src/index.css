@@ -1,0 +1,14 @@
+@import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Indie+Flower&family=Montserrat:wght@700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Yellowtail&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Adicionando a fonte 'Montserrat' para o título principal */
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: #f3e8ff;
+}
