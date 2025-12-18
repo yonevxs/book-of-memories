@@ -23,8 +23,7 @@ export default function Book({ session }) {
   
   const isMobile = useIsMobile();
 
-  // --- AJUSTE DE ALTURA (AUMENTADO) ---
-  // Mobile: 290 largura x 600 altura (Bem alto, estilo tela cheia)
+  // Mantendo a altura grande que você pediu
   const bookWidth = isMobile ? 290 : 300;
   const bookHeight = isMobile ? 600 : 420;
 
@@ -82,16 +81,14 @@ export default function Book({ session }) {
     : { transform: 'translateX(0px)' };
 
   return (
-    // MUDANÇAS CRÍTICAS AQUI:
-    // 1. h-[100dvh]: Garante que ocupa 100% da tela visível do celular (desconta a barra de navegação).
-    // 2. overflow-y-auto: Habilita a rolagem DENTRO desse container, ignorando bloqueios do body.
-    // 3. fixed inset-0: Fixa o container na tela para evitar que o navegador tente rolar o fundo errado.
-    <div className={`fixed inset-0 h-[100dvh] w-full flex flex-col justify-between transition-colors duration-500 overflow-y-auto overflow-x-hidden ${
+    // MUDANÇA 1: min-h-screen (permite crescer) e SEM overflow-hidden no eixo Y
+    <div className={`min-h-screen w-full flex flex-col relative transition-colors duration-500 overflow-x-hidden ${
       isDarkMode ? "bg-gray-900" : "bg-gradient-to-br from-dream-bg via-white to-pink-100"
     }`}>
 
       <Notification message={notify.message} type={notify.type} onClose={() => setNotify({ message: '', type: '' })} />
 
+      {/* Navbar normal (não fixa, para rolar junto com a página) */}
       <Navbar 
         isDarkMode={isDarkMode} 
         toggleTheme={() => setIsDarkMode(!isDarkMode)} 
@@ -106,10 +103,10 @@ export default function Book({ session }) {
         isDarkMode={isDarkMode}
       />
 
-      {/* Adicionei 'pb-24' para garantir que o footer suba bastante e não fique escondido */}
-      <main className="flex-grow flex flex-col items-center justify-start md:justify-center relative w-full pt-4 md:pt-0 pb-24">
+      {/* MUDANÇA 2: flex-grow e padding vertical generoso (py-8) */}
+      <main className="flex-grow flex flex-col items-center justify-start w-full py-8 md:justify-center md:py-0">
         
-        <h1 className={`mb-12 md:mb-10 font-title text-2xl md:text-4xl font-bold uppercase tracking-wide drop-shadow-sm transition-colors duration-500 text-center px-4 ${
+        <h1 className={`mb-8 md:mb-10 font-title text-2xl md:text-4xl font-bold uppercase tracking-wide drop-shadow-sm transition-colors duration-500 text-center px-4 ${
             isDarkMode ? "text-purple-300" : "text-purple-800"
         }`}>
           {isMobile ? "Meus melhores momentos" : "Book of Memories"}
@@ -184,9 +181,10 @@ export default function Book({ session }) {
         </div>
       </main>
 
-      {/* Footer Fixo: Se preferir, tire o 'pb-24' do main e deixe o footer fluir, 
-          mas assim garantimos que ele aparece no final da rolagem */}
-      <Footer isDarkMode={isDarkMode} />
+      {/* MUDANÇA 3: Wrapper para o Footer garantir que ele ocupe espaço no fluxo */}
+      <div className="w-full shrink-0 py-4">
+         <Footer isDarkMode={isDarkMode} />
+      </div>
     </div>
   );
 }

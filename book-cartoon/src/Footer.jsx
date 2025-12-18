@@ -2,8 +2,9 @@ import React from 'react';
 
 export default function Footer({ isDarkMode }) {
   return (
-    <footer className={`w-full py-3 text-center text-sm font-hand font-bold tracking-wide z-20 transition-colors duration-500 ${isDarkMode ? 'text-white bg-dream-dark' : 'text-white bg-purple-400'}`}>
+    <footer className={`w-full text-center p-4 text-xs font-bold font-title opacity-70 ${isDarkMode ? 'text-white' : 'text-dream-dark'}`}>
       ~ Arraste as pontinhas da página para ler ~
     </footer>
   );
 }
+
