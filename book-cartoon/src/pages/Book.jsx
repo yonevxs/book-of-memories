@@ -82,7 +82,9 @@ export default function Book({ session }) {
     : { transform: 'translateX(0px)' };
 
   return (
-    <div className={`h-screen w-full flex flex-col justify-between overflow-hidden transition-colors duration-500 ${
+    // 1. MUDANÇA AQUI: 'min-h-screen' em vez de 'h-screen'
+    // 2. MUDANÇA AQUI: 'overflow-x-hidden' em vez de 'overflow-hidden' (libera o scroll vertical)
+    <div className={`min-h-screen w-full flex flex-col justify-between transition-colors duration-500 overflow-x-hidden ${
       isDarkMode ? "bg-gray-900" : "bg-gradient-to-br from-dream-bg via-white to-pink-100"
     }`}>
 
@@ -102,9 +104,9 @@ export default function Book({ session }) {
         isDarkMode={isDarkMode}
       />
 
-      <main className="flex-grow flex flex-col items-center justify-start md:justify-center relative w-full overflow-hidden pt-4 md:pt-0">
+      {/* 3. MUDANÇA AQUI: Adicionei 'pb-12' para dar espaço antes do footer */}
+      <main className="flex-grow flex flex-col items-center justify-start md:justify-center relative w-full pt-4 md:pt-0 pb-12">
         
-        {/* --- ESPAÇAMENTO AUMENTADO (mb-12) --- */}
         <h1 className={`mb-12 md:mb-10 font-title text-2xl md:text-4xl font-bold uppercase tracking-wide drop-shadow-sm transition-colors duration-500 text-center px-4 ${
             isDarkMode ? "text-purple-300" : "text-purple-800"
         }`}>
