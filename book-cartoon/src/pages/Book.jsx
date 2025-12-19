@@ -12,6 +12,9 @@ import Footer from '../Footer';
 import AddMemoryModal from '../AddMemoryModal';
 import Notification from '../Notification';
 
+// 1. IMPORTANTE: A Galeria é importada aqui no PAI agora
+import MediaGallery from '../MediaGallery'; 
+
 export default function Book({ session }) {
   const navigate = useNavigate();
   const bookRef = useRef(null);
@@ -21,6 +24,10 @@ export default function Book({ session }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [notify, setNotify] = useState({ message: '', type: '' });
   
+  // 2. NOVO ESTADO: Controla qual memória está aberta na galeria
+  // null = fechado, array = aberto com fotos
+  const [galleryData, setGalleryData] = useState(null);
+
   const isMobile = useIsMobile();
 
   // Mantendo a altura grande que você pediu
@@ -32,7 +39,7 @@ export default function Book({ session }) {
   }, [session]);
 
   const fetchMemories = async () => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('memories')
       .select('*')
       .eq('user_id', session.user.id)
@@ -47,29 +54,55 @@ export default function Book({ session }) {
   };
 
   const handleAddMemory = async (newMemory) => {
-    let finalUrl = null;
+    const mediaList = [];
+
     try {
-      if (newMemory.mediaFile) {
-        const fileExt = newMemory.mediaFile.name.split('.').pop();
-        const fileName = `${Date.now()}.${fileExt}`; 
-        const filePath = `${session.user.id}/${fileName}`;
-        const { error: uploadError } = await supabase.storage.from('memory-images').upload(filePath, newMemory.mediaFile);
-        if (uploadError) throw uploadError;
-        const { data: urlData } = supabase.storage.from('memory-images').getPublicUrl(filePath);
-        finalUrl = urlData.publicUrl;
+      if (newMemory.mediaFiles && newMemory.mediaFiles.length > 0) {
+        
+        await Promise.all(newMemory.mediaFiles.map(async (file) => {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${Date.now()}-${Math.random()}.${fileExt}`; 
+          const filePath = `${session.user.id}/${fileName}`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('memory-images')
+            .upload(filePath, file);
+
+          if (uploadError) throw uploadError;
+
+          const { data: urlData } = supabase.storage
+            .from('memory-images')
+            .getPublicUrl(filePath);
+
+          mediaList.push({
+            url: urlData.publicUrl,
+            type: file.type.startsWith('video/') ? 'video' : 'image'
+          });
+        }));
       }
+
       const memoryToSave = {
         title: newMemory.title,
         description: newMemory.description,
         date: newMemory.date,
         user_id: session.user.id,
-        image_url: newMemory.mediaType === 'video' ? null : (finalUrl || "https://via.placeholder.com/400x300?text=Sem+Foto"),
-        video_url: newMemory.mediaType === 'video' ? finalUrl : null
+        // Compatibilidade com campos antigos
+        image_url: mediaList.length > 0 && mediaList[0].type === 'image' ? mediaList[0].url : null,
+        video_url: mediaList.length > 0 && mediaList[0].type === 'video' ? mediaList[0].url : null,
+        // Lista completa
+        media: mediaList 
       };
-      const { data, error: dbError } = await supabase.from('memories').insert([memoryToSave]).select();
+
+      const { data, error: dbError } = await supabase
+        .from('memories')
+        .insert([memoryToSave])
+        .select();
+
       if (dbError) throw dbError;
+
       setBookMemories([...bookMemories, data[0]]);
-      setNotify({ message: 'Memória eternizada com sucesso!', type: 'success' });
+      setNotify({ message: 'Memórias eternizadas com sucesso!', type: 'success' });
+
     } catch (error) {
       console.error(error);
       setNotify({ message: 'Erro ao salvar: ' + error.message, type: 'error' });
@@ -81,14 +114,20 @@ export default function Book({ session }) {
     : { transform: 'translateX(0px)' };
 
   return (
-    // MUDANÇA 1: min-h-screen (permite crescer) e SEM overflow-hidden no eixo Y
-    <div className={`min-h-screen w-full flex flex-col relative transition-colors duration-500 overflow-x-hidden ${
+    // LAYOUT FIX: 'fixed inset-0 h-[100dvh]' garante a altura correta no mobile e permite scroll interno
+    <div className={`fixed inset-0 h-[100dvh] w-full flex flex-col relative transition-colors duration-500 overflow-x-hidden ${
       isDarkMode ? "bg-gray-900" : "bg-gradient-to-br from-dream-bg via-white to-pink-100"
     }`}>
 
+      {/* 3. COMPONENTE DA GALERIA (Topo da hierarquia visual) */}
+      <MediaGallery 
+        isOpen={!!galleryData} 
+        onClose={() => setGalleryData(null)} 
+        mediaItems={galleryData || []} 
+      />
+
       <Notification message={notify.message} type={notify.type} onClose={() => setNotify({ message: '', type: '' })} />
 
-      {/* Navbar normal (não fixa, para rolar junto com a página) */}
       <Navbar 
         isDarkMode={isDarkMode} 
         toggleTheme={() => setIsDarkMode(!isDarkMode)} 
@@ -103,8 +142,8 @@ export default function Book({ session }) {
         isDarkMode={isDarkMode}
       />
 
-      {/* MUDANÇA 2: flex-grow e padding vertical generoso (py-8) */}
-      <main className="flex-grow flex flex-col items-center justify-start w-full py-8 md:justify-center md:py-0">
+      {/* Scroll acontece aqui dentro (overflow-y-auto) */}
+      <main className="flex-grow flex flex-col items-center justify-start w-full py-8 md:justify-center md:py-0 overflow-y-auto">
         
         <h1 className={`mb-8 md:mb-10 font-title text-2xl md:text-4xl font-bold uppercase tracking-wide drop-shadow-sm transition-colors duration-500 text-center px-4 ${
             isDarkMode ? "text-purple-300" : "text-purple-800"
@@ -112,7 +151,7 @@ export default function Book({ session }) {
           {isMobile ? "Meus melhores momentos" : "Book of Memories"}
         </h1>
 
-        <div className="relative z-10 flex flex-col items-center justify-center w-full px-2">
+        <div className="relative z-10 flex flex-col items-center justify-center w-full px-2 pb-24">
           
           {/* Tutorial Mobile */}
           {bookMemories.length === 0 && isMobile && (
@@ -161,7 +200,13 @@ export default function Book({ session }) {
               <IntroPage session={session} />
 
               {bookMemories.map((mem, index) => (
-                <Page key={mem.id} data={mem} pageNumber={index + 1} />
+                <Page 
+                  key={mem.id} 
+                  data={mem} 
+                  pageNumber={index + 1}
+                  // 4. AQUI ESTÁ O SEGREDINHO: Passamos a função pro filho
+                  onOpenGallery={(mediaList) => setGalleryData(mediaList)}
+                />
               ))}
 
               <CoverPage className="bg-dream-purple border-[2px] md:border-[4px] border-white rounded-l-lg shadow-inner flex items-center justify-center">
@@ -181,7 +226,6 @@ export default function Book({ session }) {
         </div>
       </main>
 
-      {/* MUDANÇA 3: Wrapper para o Footer garantir que ele ocupe espaço no fluxo */}
       <div className="w-full shrink-0 py-4">
          <Footer isDarkMode={isDarkMode} />
       </div>

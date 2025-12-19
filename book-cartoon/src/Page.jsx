@@ -1,62 +1,99 @@
 import React from 'react';
+// NÃO importe mais o MediaGallery aqui!
 
-const Page = React.forwardRef(({ data, pageNumber }, ref) => {
+const Page = React.forwardRef(({ data, pageNumber, onOpenGallery }, ref) => {
   
-  // Verifica se tem vídeo
-  const isVideo = !!data.video_url;
-  
-  // Se for imagem, define qual usar
-  const imageSource = data.image_url || data.image || "https://via.placeholder.com/400x300?text=Sem+Foto";
+  // Normaliza os dados
+  let mediaList = data.media || [];
+  if (mediaList.length === 0) {
+    if (data.video_url) mediaList.push({ type: 'video', url: data.video_url });
+    else if (data.image_url) mediaList.push({ type: 'image', url: data.image_url });
+  }
+
+  // Placeholder se estiver vazio
+  if (mediaList.length === 0) {
+    mediaList.push({ type: 'image', url: "https://via.placeholder.com/400x300?text=Sem+Foto" });
+  }
+
+  const mainItem = mediaList[0];
+  const hasMultiple = mediaList.length > 1;
+
+  const handleClick = (e) => {
+    e.stopPropagation(); // Evita virar a página
+    // Chama a função do Pai (Book.jsx)
+    if (onOpenGallery) {
+       onOpenGallery(mediaList);
+    }
+  };
 
   return (
-    <div className="w-full h-full bg-dream-paper p-8 flex flex-col shadow-inner-page relative overflow-hidden" ref={ref}>
-      
-      {/* Cabeçalho */}
-      <div className="flex justify-between items-end border-b-2 border-purple-200 pb-2 mb-4">
-        <h2 className="text-2xl font-hand-title text-dream-dark font-bold truncate max-w-[70%]">{data.title}</h2>
-        <span className="font-hand text-purple-400 text-sm font-bold">{data.date}</span>
-      </div>
-
-      {/* Área da Mídia (Polaroid) */}
-      <div className="relative w-full mb-6 group hover:rotate-0 transition-transform duration-500 rotate-1">
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-24 h-6 bg-soft-pink opacity-80 rotate-2 shadow-sm z-10"></div>
+    <div className="w-full h-full bg-dream-paper p-6 md:p-8 flex flex-col shadow-inner-page relative overflow-hidden" ref={ref}>
         
-        <div className="bg-white p-2 shadow-md rounded-sm">
-          
-          {isVideo ? (
-            /* PLAYER DE VÍDEO ESTILIZADO */
-            <video 
-              src={data.video_url} 
-              controls 
-              className="w-full h-40 object-cover rounded-sm border border-gray-100"
-            />
-          ) : (
-            /* IMAGEM PADRÃO */
-            <img 
-              src={imageSource} 
-              alt={data.title} 
-              className="w-full h-40 object-cover rounded-sm filter sepia-[10%]" 
-            />
-          )}
-
+        {/* Cabeçalho */}
+        <div className="flex justify-between items-end border-b-2 border-purple-200 pb-2 mb-4">
+          <h2 className="text-2xl font-hand-title text-dream-dark font-bold truncate max-w-[70%]">{data.title}</h2>
+          <span className="font-hand text-purple-400 text-sm font-bold">{data.date}</span>
         </div>
-      </div>
 
-      {/* Texto */}
-      <div className="flex-grow overflow-y-auto scrollbar-thin scrollbar-thumb-purple-200 pb-14">
-        <p className="font-hand text-xl text-gray-700 leading-relaxed font-semibold text-justify">
-          {data.description}
-        </p>
-      </div>
+        {/* --- ÁREA DA POLAROID --- */}
+        <div 
+          className="relative w-full h-48 mb-6 flex items-center justify-center cursor-pointer group z-10"
+          onClick={handleClick} // Chama o pai
+        >
+            {/* O Alfinete */}
+            <div className="absolute top-0 z-30 w-4 h-4 rounded-full bg-red-400 shadow-md border border-red-600 pointer-events-none">
+               <div className="absolute top-1 left-1 w-1 h-1 bg-white/50 rounded-full"></div>
+            </div>
 
-      {/* Rodapé */}
-      <div className="absolute bottom-4 left-0 w-full text-center">
-         <span className="text-purple-300 font-hand text-lg flex items-center justify-center gap-2">
-            <span className="font-sans text-xs opacity-70">✿</span> 
-            {pageNumber} 
-            <span className="font-sans text-xs opacity-70">✿</span>
-         </span>
-      </div>
+            {/* Fotos de fundo */}
+            {hasMultiple && mediaList.slice(1, 3).map((_, idx) => (
+                <div 
+                  key={idx}
+                  className="absolute w-[85%] h-40 bg-white p-2 shadow-sm border border-gray-200 pointer-events-none"
+                  style={{ 
+                    transform: `rotate(${idx % 2 === 0 ? '-6deg' : '6deg'}) scale(0.95)`,
+                    zIndex: 0 
+                  }}
+                >
+                  <div className="w-full h-full bg-gray-100"></div>
+                </div>
+            ))}
+
+            {/* Foto Principal */}
+            <div className="relative w-[90%] h-44 bg-white p-2 shadow-lg border border-gray-100 transform group-hover:scale-105 transition-transform duration-300 rotate-1 z-20">
+                {mainItem.type === 'video' ? (
+                  <div className="w-full h-full bg-black flex items-center justify-center relative rounded-sm overflow-hidden pointer-events-none">
+                     {/* Nota: Usamos video aqui só para o thumb, sem controls */}
+                     <video src={mainItem.url} className="w-full h-full object-cover opacity-80" muted />
+                     <span className="absolute text-white text-4xl opacity-80">▶</span>
+                  </div>
+                ) : (
+                  <img src={mainItem.url} className="w-full h-full object-cover rounded-sm filter sepia-[10%] pointer-events-none" />
+                )}
+                
+                {hasMultiple && (
+                   <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-md font-bold pointer-events-none">
+                     +{mediaList.length - 1}
+                   </div>
+                )}
+            </div>
+        </div>
+
+        {/* Texto */}
+        <div className="flex-grow overflow-y-auto scrollbar-thin scrollbar-thumb-purple-200 pb-14">
+          <p className="font-hand text-xl text-gray-700 leading-relaxed font-semibold text-justify">
+            {data.description || <span className="opacity-50 italic text-sm">Sem descrição...</span>}
+          </p>
+        </div>
+
+        {/* Rodapé */}
+        <div className="absolute bottom-4 left-0 w-full text-center">
+           <span className="text-purple-300 font-hand text-lg flex items-center justify-center gap-2">
+              <span className="font-sans text-xs opacity-70">✿</span> 
+              {pageNumber} 
+              <span className="font-sans text-xs opacity-70">✿</span>
+           </span>
+        </div>
     </div>
   );
 });
