@@ -11,9 +11,9 @@ import Navbar from '../Navbar';
 import Footer from '../Footer';
 import AddMemoryModal from '../AddMemoryModal';
 import Notification from '../Notification';
-
-// 1. IMPORTANTE: A Galeria é importada aqui no PAI agora
 import MediaGallery from '../MediaGallery'; 
+// CORREÇÃO 1: Modal com "a"
+import DeleteConfirmModal from '../DeleteConfirmModal';
 
 export default function Book({ session }) {
   const navigate = useNavigate();
@@ -24,15 +24,14 @@ export default function Book({ session }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [notify, setNotify] = useState({ message: '', type: '' });
   
-  // 2. NOVO ESTADO: Controla qual memória está aberta na galeria
-  // null = fechado, array = aberto com fotos
   const [galleryData, setGalleryData] = useState(null);
+  const [memoryToEdit, setMemoryToEdit] = useState(null);
+  const [memoryToDelete, setMemoryToDelete] = useState(null);
 
   const isMobile = useIsMobile();
 
-  // Mantendo a altura grande que você pediu
   const bookWidth = isMobile ? 290 : 300;
-  const bookHeight = isMobile ? 600 : 460;
+  const bookHeight = isMobile ? 600 : 470;
 
   useEffect(() => {
     fetchMemories();
@@ -53,13 +52,39 @@ export default function Book({ session }) {
     navigate('/');
   };
 
-  const handleAddMemory = async (newMemory) => {
-    const mediaList = [];
+  // --- FUNÇÃO DELETAR ---
+  // (Nota: Removemos o window.confirm daqui porque o Modal visual vai fazer esse papel)
+  // Essa função apenas executa a deleção QUANDO o modal confirma
+  const confirmDelete = async () => {
+    if (!memoryToDelete) return;
 
     try {
-      if (newMemory.mediaFiles && newMemory.mediaFiles.length > 0) {
-        
-        await Promise.all(newMemory.mediaFiles.map(async (file) => {
+      const { error } = await supabase.from('memories').delete().eq('id', memoryToDelete);
+      if (error) throw error;
+
+      setBookMemories(prev => prev.filter(mem => mem.id !== memoryToDelete));
+      setNotify({ message: 'Página removida com sucesso.', type: 'success' });
+    } catch (error) {
+      setNotify({ message: 'Erro ao deletar: ' + error.message, type: 'error' });
+    } finally {
+      setMemoryToDelete(null); // Fecha o modal
+    }
+  };
+
+  // Função chamada pelo botão da lixeira na página (apenas abre o modal)
+  const requestDelete = (id) => {
+    setMemoryToDelete(id); 
+  };
+
+  const openEditModal = (memory) => {
+    setMemoryToEdit(memory);
+    setIsModalOpen(true);
+  };
+
+  const uploadFiles = async (files) => {
+    const uploadedMedia = [];
+    if (files && files.length > 0) {
+        await Promise.all(files.map(async (file) => {
           const fileExt = file.name.split('.').pop();
           const fileName = `${Date.now()}-${Math.random()}.${fileExt}`; 
           const filePath = `${session.user.id}/${fileName}`;
@@ -68,44 +93,94 @@ export default function Book({ session }) {
             .from('memory-images')
             .upload(filePath, file);
 
-          if (uploadError) throw uploadError;
+          if (!uploadError) {
+             const { data: urlData } = supabase.storage
+               .from('memory-images')
+               .getPublicUrl(filePath);
 
-          const { data: urlData } = supabase.storage
-            .from('memory-images')
-            .getPublicUrl(filePath);
-
-          mediaList.push({
-            url: urlData.publicUrl,
-            type: file.type.startsWith('video/') ? 'video' : 'image'
-          });
+             uploadedMedia.push({
+               url: urlData.publicUrl,
+               type: file.type.startsWith('video/') ? 'video' : 'image'
+             });
+          }
         }));
-      }
+    }
+    return uploadedMedia;
+  };
+
+  const handleAddMemory = async (newMemory) => {
+    try {
+      const mediaList = await uploadFiles(newMemory.mediaFiles);
 
       const memoryToSave = {
         title: newMemory.title,
         description: newMemory.description,
         date: newMemory.date,
         user_id: session.user.id,
-        // Compatibilidade com campos antigos
         image_url: mediaList.length > 0 && mediaList[0].type === 'image' ? mediaList[0].url : null,
         video_url: mediaList.length > 0 && mediaList[0].type === 'video' ? mediaList[0].url : null,
-        // Lista completa
         media: mediaList 
       };
 
-      const { data, error: dbError } = await supabase
-        .from('memories')
-        .insert([memoryToSave])
-        .select();
-
+      const { data, error: dbError } = await supabase.from('memories').insert([memoryToSave]).select();
       if (dbError) throw dbError;
 
-      setBookMemories([...bookMemories, data[0]]);
-      setNotify({ message: 'Memórias eternizadas com sucesso!', type: 'success' });
+      if (data && data.length > 0) {
+          setBookMemories([...bookMemories, data[0]]);
+          setNotify({ message: 'Memória criada com sucesso!', type: 'success' });
+      } else {
+          fetchMemories();
+      }
 
     } catch (error) {
       console.error(error);
       setNotify({ message: 'Erro ao salvar: ' + error.message, type: 'error' });
+    }
+  };
+
+  const handleEditMemory = async (id, updatedData) => {
+    try {
+        const newMedia = await uploadFiles(updatedData.mediaFiles);
+        const oldMemory = bookMemories.find(m => m.id === id);
+        if (!oldMemory) return;
+
+        const oldMedia = oldMemory.media || [];
+        if (oldMedia.length === 0 && (oldMemory.image_url || oldMemory.video_url)) {
+            if(oldMemory.video_url) oldMedia.push({type: 'video', url: oldMemory.video_url});
+            else if(oldMemory.image_url) oldMedia.push({type: 'image', url: oldMemory.image_url});
+        }
+
+        const finalMedia = [...oldMedia, ...newMedia];
+
+        const { data, error } = await supabase
+          .from('memories')
+          .update({
+            title: updatedData.title,
+            description: updatedData.description,
+            date: updatedData.date,
+            media: finalMedia,
+            image_url: finalMedia.length > 0 && finalMedia[0].type === 'image' ? finalMedia[0].url : null,
+            video_url: finalMedia.length > 0 && finalMedia[0].type === 'video' ? finalMedia[0].url : null,
+          })
+          .eq('id', id)
+          .select();
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+            setBookMemories(prev => prev.map(m => m.id === id ? data[0] : m));
+            setNotify({ message: 'Página atualizada!', type: 'success' });
+            setMemoryToEdit(null); 
+        } else {
+            console.warn("Update feito, mas sem retorno de dados. Recarregando...");
+            await fetchMemories(); 
+            setMemoryToEdit(null);
+            setNotify({ message: 'Página atualizada!', type: 'success' });
+        }
+
+    } catch (error) {
+        console.error(error);
+        setNotify({ message: 'Erro ao editar: ' + error.message, type: 'error' });
     }
   };
 
@@ -114,16 +189,22 @@ export default function Book({ session }) {
     : { transform: 'translateX(0px)' };
 
   return (
-    // LAYOUT FIX: 'fixed inset-0 h-[100dvh]' garante a altura correta no mobile e permite scroll interno
     <div className={`fixed inset-0 h-[100dvh] w-full flex flex-col relative transition-colors duration-500 overflow-x-hidden ${
       isDarkMode ? "bg-gray-900" : "bg-gradient-to-br from-dream-bg via-white to-pink-100"
     }`}>
 
-      {/* 3. COMPONENTE DA GALERIA (Topo da hierarquia visual) */}
       <MediaGallery 
         isOpen={!!galleryData} 
         onClose={() => setGalleryData(null)} 
         mediaItems={galleryData || []} 
+      />
+
+      {/* CORREÇÃO 2: Modal com "a" */}
+      <DeleteConfirmModal 
+        isOpen={!!memoryToDelete} 
+        onClose={() => setMemoryToDelete(null)} 
+        onConfirm={confirmDelete} 
+        isDarkMode={isDarkMode}
       />
 
       <Notification message={notify.message} type={notify.type} onClose={() => setNotify({ message: '', type: '' })} />
@@ -131,18 +212,19 @@ export default function Book({ session }) {
       <Navbar 
         isDarkMode={isDarkMode} 
         toggleTheme={() => setIsDarkMode(!isDarkMode)} 
-        onOpenModal={() => setIsModalOpen(true)}
+        onOpenModal={() => { setMemoryToEdit(null); setIsModalOpen(true); }}
         onLogout={handleLogout} 
       />
       
       <AddMemoryModal 
         isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+        onClose={() => { setIsModalOpen(false); setMemoryToEdit(null); }} 
         onAdd={handleAddMemory}
+        onEdit={handleEditMemory}
+        memoryToEdit={memoryToEdit}
         isDarkMode={isDarkMode}
       />
 
-      {/* Scroll acontece aqui dentro (overflow-y-auto) */}
       <main className="flex-grow flex flex-col items-center justify-start w-full py-8 md:justify-center md:py-0 overflow-y-auto">
         
         <h1 className={`mb-8 md:mb-10 font-title text-2xl md:text-4xl font-bold uppercase tracking-wide drop-shadow-sm transition-colors duration-500 text-center px-4 ${
@@ -199,15 +281,19 @@ export default function Book({ session }) {
 
               <IntroPage session={session} />
 
-              {bookMemories.map((mem, index) => (
-                <Page 
-                  key={mem.id} 
-                  data={mem} 
-                  pageNumber={index + 1}
-                  // 4. AQUI ESTÁ O SEGREDINHO: Passamos a função pro filho
-                  onOpenGallery={(mediaList) => setGalleryData(mediaList)}
-                />
-              ))}
+              {bookMemories.map((mem, index) => {
+                 if (!mem) return null;
+                 return (
+                    <Page 
+                      key={mem.id || index} 
+                      data={mem} 
+                      pageNumber={index + 1}
+                      onOpenGallery={(mediaList) => setGalleryData(mediaList)}
+                      onDelete={() => requestDelete(mem.id)}
+                      onEdit={() => openEditModal(mem)}
+                    />
+                 );
+              })}
 
               <CoverPage className="bg-dream-purple border-[2px] md:border-[4px] border-white rounded-l-lg shadow-inner flex items-center justify-center">
                 <div className="w-full h-full flex flex-col items-center justify-center border-2 border-white/30 rounded-lg dashed-border p-4 md:p-6">
