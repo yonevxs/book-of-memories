@@ -12,3 +12,19 @@ body {
   background-color: #f3e8ff;
   overflow-x: hidden;
 }
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px; /* Bem fina */
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent; 
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #d8b4fe; /* Cor Lilás (dream-purple) */
+  border-radius: 20px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #a855f7; /* Roxo mais escuro ao passar o mouse */
+}

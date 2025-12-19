@@ -32,7 +32,7 @@ export default function Book({ session }) {
 
   // Mantendo a altura grande que você pediu
   const bookWidth = isMobile ? 290 : 300;
-  const bookHeight = isMobile ? 600 : 420;
+  const bookHeight = isMobile ? 600 : 460;
 
   useEffect(() => {
     fetchMemories();
